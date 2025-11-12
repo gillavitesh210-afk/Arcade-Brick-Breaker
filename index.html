@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Arcade Brick Breaker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="description" content="Fast, juicy Brick Breaker with power-ups, skins, coins and a global leaderboard. Play free on web & mobile.">
+  <meta name="theme-color" content="#041122">
+
+  <meta property="og:title" content="Arcade Brick Breaker">
+  <meta property="og:description" content="Break bricks, earn coins, power up, compete!">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="icons/og-1200x630.png">
+  <meta property="og:url" content="./">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <style>
+    :root{ --bg1:#041122; --bg2:#081726; --muted:#9fb1c9; --gold:#ffd24d; }
+    *{box-sizing:border-box} html,body{height:100%; margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
+      background: radial-gradient(1200px 600px at 10% 10%, #041022 0%, #041022 40%, #03121a 100%); color:#e8f6ff}
+    .wrap{max-width:1100px;margin:12px auto;padding:12px;display:flex;flex-direction:column;gap:12px;align-items:center}
+    .hud{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .hud .left,.hud .right{display:flex;gap:10px;align-items:center;color:var(--muted)}
+    .hud .center{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}
+    button{background:linear-gradient(180deg,#153043,#0b1622);border:1px solid rgba(255,255,255,0.06);color:#e6f7ff;padding:8px 12px;border-radius:8px;cursor:pointer}
+    button.small{padding:6px 8px;font-size:13px}
+    .monetize{display:flex;gap:10px;align-items:center;justify-content:center;width:100%;flex-wrap:wrap}
+    .banner{width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);border-radius:10px;padding:10px;text-align:center}
+    .banner a{color:#bfe2ff;text-decoration:none}
+    .canvas-wrap{position:relative;width:100%;display:flex;justify-content:center}
+    canvas{background:linear-gradient(180deg,#041426,#02101a);border-radius:12px;box-shadow:0 30px 70px rgba(2,6,23,0.7);max-width:100%}
+    .overlay{position:absolute;left:50%;transform:translateX(-50%);pointer-events:none;top:8%;width:86%;max-width:920px}
+    .overlay .card{pointer-events:auto;background:linear-gradient(180deg,rgba(2,6,23,0.94),rgba(2,6,23,0.9));padding:16px;border-radius:12px;border:1px solid rgba(255,255,255,0.04);text-align:center}
+    .shopModal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px)}
+    .modalInner{background:#071426;padding:16px;border-radius:12px;width:720px;max-width:94%}
+    .shop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px}
+    .shop-item{background:rgba(255,255,255,0.02);padding:10px;border-radius:8px}
+    .hint{position:fixed;left:12px;bottom:12px;background:rgba(0,0,0,0.28);padding:8px 12px;border-radius:8px;color:var(--muted);font-size:13px}
+    @media (max-width:820px){ .shop-grid{grid-template-columns:repeat(2,1fr)} }
+    .cookie{position:fixed;z-index:9999;left:12px;right:12px;bottom:12px;background:#081726;border:1px solid rgba(255,255,255,0.08);
+      border-radius:10px;padding:12px;display:none}
+    .cookie p{margin:0 0 8px 0;color:#cfe5ff}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hud">
+      <div class="left">
+        <div id="level">Level: 1</div>
+        <div id="score">Score: 0</div>
+        <div id="coins">Coins: 0</div>
+      </div>
+      <div class="center">
+        <button id="startBtn">Start</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="restartBtn">Restart</button>
+        <button id="shopBtn">Shop</button>
+        <button id="musicBtn" class="small">🔊 Music</button>
+      </div>
+      <div class="right">
+        <div id="lives">Lives: 3</div>
+        <div id="high">High: 0</div>
+      </div>
+    </div>
+
+    <div class="monetize" id="monetizeBar">
+      <button id="rewardBtn" class="small">🎁 Watch Ad (Get 30 coins)</button>
+      <button id="dailyBtn" class="small">🗓️ Daily Reward</button>
+      <button id="removeAdsBtn" class="small">🚫 Remove Ads</button>
+      <a id="donateBtn" class="small" href="https://www.buymeacoffee.com/yourname" target="_blank" rel="noopener">❤ Support Dev</a>
+      <button id="shareBtn" class="small">🔗 Share</button>
+    </div>
+
+    <div class="banner" id="bannerBox">
+      <div id="adsensePlaceholder" style="margin:6px 0; opacity:.9">
+        <em>Ad placeholder — add your AdSense code when your site is approved.</em>
+      </div>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="gameCanvas" width="980" height="580"></canvas>
+      <div class="overlay" id="overlay"></div>
+    </div>
+
+    <div id="shopModal" class="shopModal" style="display:none">
+      <div class="modalInner">
+        <h3 style="margin:0">Shop & Leaderboard</h3>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="tabBtn" data-tab="skins">Skins</button>
+          <button class="tabBtn" data-tab="packs">Power Packs</button>
+          <button class="tabBtn" data-tab="inventory">Inventory</button>
+          <button class="tabBtn" data-tab="leader">Leaderboard</button>
+          <button class="tabBtn" data-tab="settings">Settings</button>
+        </div>
+        <div id="tabContent" style="margin-top:10px"></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px">
+          <button id="closeShopBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="adModal" class="shopModal" style="display:none">
+      <div class="modalInner" style="max-width:560px">
+        <div style="font-weight:700;margin-bottom:8px">Sponsored • Rewarded Ad</div>
+        <div style="display:flex;gap:12px;align-items:center;background:rgba(255,255,255,0.03);padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.05)">
+          <div style="width:72px;height:72px;border-radius:8px;background:linear-gradient(180deg,#7dd3fc,#38bdf8);display:flex;align-items:center;justify-content:center;color:#04121f;font-weight:800">Ad</div>
+          <div>
+            <div style="font-weight:700">Cool Game — Try it!</div>
+            <div style="color:#9fb1c9;font-size:13px">Safe ad simulator for testing. Replace with real rewarded ads in your mobile build.</div>
+          </div>
+        </div>
+        <div style="margin-top:10px; color:#dff1ff">⏳ Finishes in <span id="adTime">15</span>s</div>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px">
+          <button id="adCloseBtn" disabled>Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+      <button id="exportBtn" class="small">Export Leaderboard</button>
+      <label for="importFile" class="small" style="cursor:pointer;background:linear-gradient(180deg,#163043,#0b1622);padding:6px 8px;border-radius:6px">Import Leaderboard</label>
+      <input id="importFile" type="file" accept="application/json" style="display:none">
+      <div style="margin-left:12px;color:#9fb1c9">Press 1–5 to use powers. A/D or ← → to move. Drag to move paddle.</div>
+    </div>
+  </div>
+
+  <div class="cookie" id="cookie">
+    <p>We use local storage to save your progress and may show ads or analytics if you consent. See our <a href="privacy.html" target="_blank" rel="noopener" style="color:#8bdcff">Privacy Policy</a>.</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="cookieDecline" class="small">Decline</button>
+      <button id="cookieAccept" class="small">Accept</button>
+    </div>
+  </div>
+
+  <div class="hint">Installable PWA • Offline support • Ad placeholders • Daily reward • Remove ads • Leaderboard (local; Firebase-ready).</div>
+
+  <script>
+    const ENABLE_FIREBASE = false;
+    const FIREBASE_CONFIG = { apiKey:"", authDomain:"", databaseURL:"", projectId:"", storageBucket:"", messagingSenderId:"", appId:"" };
+  </script>
+  <script>
+    if (typeof ENABLE_FIREBASE !== 'undefined' && ENABLE_FIREBASE) {
+      const s1=document.createElement('script'); s1.src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"; s1.defer=true; document.head.appendChild(s1);
+      const s2=document.createElement('script'); s2.src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"; s2.defer=true; document.head.appendChild(s2);
+    }
+  </script>
+
+  <script>
+  window.addEventListener('DOMContentLoaded', () => {
+    'use strict';
+    const $=id=>document.getElementById(id);
+
+    /* Cookie consent */
+    const COOKIE_KEY='bb_cookie_opt'; const cookieEl=$('cookie'), acceptBtn=$('cookieAccept'), declineBtn=$('cookieDecline');
+    const cookieVal=localStorage.getItem(COOKIE_KEY); if(!cookieVal) cookieEl.style.display='block';
+    acceptBtn.onclick=()=>{ localStorage.setItem(COOKIE_KEY,'accepted'); cookieEl.style.display='none'; };
+    declineBtn.onclick=()=>{ localStorage.setItem(COOKIE_KEY,'declined'); cookieEl.style.display='none'; };
+
+    /* DOM */
+    const canvas=$('gameCanvas'); const ctx=canvas.getContext('2d');
+    const startBtn=$('startBtn'), pauseBtn=$('pauseBtn'), restartBtn=$('restartBtn'), shopBtn=$('shopBtn'), musicBtn=$('musicBtn');
+    const overlayEl=$('overlay'), shopModal=$('shopModal'), tabContent=$('tabContent'), closeShopBtn=$('closeShopBtn');
+    const exportBtn=$('exportBtn'), importFile=$('importFile');
+    const levelEl=$('level'), scoreEl=$('score'), coinsEl=$('coins'), livesEl=$('lives'), highEl=$('high');
+    const rewardBtn=$('rewardBtn'), dailyBtn=$('dailyBtn'), removeAdsBtn=$('removeAdsBtn'), donateBtn=$('donateBtn'), shareBtn=$('shareBtn');
+    const bannerBox=$('bannerBox');
+    const adModal=$('adModal'), adTimeEl=$('adTime'), adCloseBtn=$('adCloseBtn');
+
+    const LS={ HIGH:'bb_high', COINS:'bb_coins', UNLOCK:'bb_unlocked', POW:'bb_powers', LEAD:'bb_lead', TRAIL:'bb_trail',
+               LAST_AD:'bb_last_ad', NOADS:'bb_noads', LAST_DAILY:'bb_last_daily' };
+    const store={ high:+localStorage.getItem(LS.HIGH)||0, coins:+localStorage.getItem(LS.COINS)||0,
+      unlocked:JSON.parse(localStorage.getItem(LS.UNLOCK)||'["default"]'),
+      powers:JSON.parse(localStorage.getItem(LS.POW)||'{"multi":0,"shield":0,"slow":0,"expand":0,"sticky":0}'),
+      leaderboard:JSON.parse(localStorage.getItem(LS.LEAD)||'[]'),
+      trail:localStorage.getItem(LS.TRAIL)||'default', lastAd:+localStorage.getItem(LS.LAST_AD)||0,
+      noAds:localStorage.getItem(LS.NOADS)==='1', lastDaily:+localStorage.getItem(LS.LAST_DAILY)||0
+    };
+    const save=()=>{ localStorage.setItem(LS.HIGH,store.high); localStorage.setItem(LS.COINS,store.coins);
+      localStorage.setItem(LS.UNLOCK,JSON.stringify(store.unlocked)); localStorage.setItem(LS.POW,JSON.stringify(store.powers));
+      localStorage.setItem(LS.LEAD,JSON.stringify(store.leaderboard)); localStorage.setItem(LS.TRAIL,store.trail);
+      localStorage.setItem(LS.LAST_AD,store.lastAd); localStorage.setItem(LS.NOADS,store.noAds?'1':'0'); localStorage.setItem(LS.LAST_DAILY,store.lastDaily); };
+
+    const state={ score:0, lives:3, level:1, running:false, paused:false, stickyActive:false, shieldActive:false };
+    const updateHUD=()=>{ levelEl.textContent='Level: '+state.level; scoreEl.textContent='Score: '+state.score; coinsEl.textContent='Coins: '+store.coins; livesEl.textContent='Lives: '+state.lives; highEl.textContent='High: '+store.high;
+      if(store.noAds){ bannerBox.style.display='none'; } };
+    const fit=()=>{ const maxW=Math.min(window.innerWidth-24,1100); const ratio=canvas.width/canvas.height; canvas.style.width=maxW+'px'; canvas.style.height=Math.round(maxW/ratio)+'px'; };
+    window.addEventListener('resize', fit); fit();
+
+    /* Audio */
+    const AC=window.AudioContext||window.webkitAudioContext; const audio=AC?new AC():null; let musicOn=false, musicTimer=null;
+    const sfx=(f=440,d=0.06,v=0.05,t='sine')=>{ if(!audio) return; const o=audio.createOscillator(), g=audio.createGain(); o.type=t; o.frequency.value=f; g.gain.value=v; o.connect(g); g.connect(audio.destination); o.start(); setTimeout(()=>{try{o.stop()}catch(_){ }},d*1000); };
+    const startMusic=()=>{ if(!audio||musicOn) return; musicOn=true; let i=0; musicTimer=setInterval(()=>{ try{ const o=audio.createOscillator(), g=audio.createGain(); o.type='sawtooth'; o.frequency.value=110*Math.pow(1.03,i%12); g.gain.value=0.0; o.connect(g); g.connect(audio.destination); o.start();
+      g.gain.linearRampToValueAtTime(0.06,audio.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.0001,audio.currentTime+0.5); setTimeout(()=>{try{o.stop()}catch(_){ }},600); i++; }catch(_){ } },350); musicBtn.textContent='🔊 Music On'; };
+    const stopMusic=()=>{ musicOn=false; if(musicTimer){clearInterval(musicTimer); musicTimer=null;} musicBtn.textContent='🔇 Music Off'; };
+    musicBtn.onclick=()=>{ if(!audio) return; if(audio.state==='suspended'){audio.resume().catch(()=>{});} musicOn?stopMusic():startMusic(); };
+
+    /* Game vars */
+    const BALL_R=10; const basePaddle={ width:120,height:14,baseSpeed:4.2,accel:0.25,maxSpeed:9 };
+    const controls={ left:false,right:false }; let paddle={...basePaddle,x:0,speed:basePaddle.baseSpeed}; let balls=[]; let particles=[], coins=[], powerups=[];
+    let brickCfg={ row:3,col:6,w:78,h:22,pad:10,offTop:50,offLeft:40 }; let bricks=[];
+
+    const setupBricks=(lvl)=>{ brickCfg.row=Math.min(6,2+Math.floor(lvl*0.8)); brickCfg.col=Math.min(10,5+Math.floor(lvl/2));
+      bricks=[]; const totalW=brickCfg.col*brickCfg.w+(brickCfg.col-1)*brickCfg.pad; brickCfg.offLeft=Math.max(20,Math.floor((canvas.width-totalW)/2));
+      for(let c=0;c<brickCfg.col;c++){ bricks[c]=[]; for(let r=0;r<brickCfg.row;r++){ let hits=1; if(lvl>=3 && Math.random()<Math.min(0.30,lvl*0.035)) hits=1+(Math.random()<0.25?1:0);
+        const moving=(lvl>=4 && Math.random()<0.1); bricks[c][r]={x:0,y:0,hits,moving,dir:Math.random()<0.5?-1:1}; } } };
+
+    const resetBallAndPaddle=()=>{ paddle.width=basePaddle.width; paddle.height=basePaddle.height; paddle.x=Math.round((canvas.width-paddle.width)/2); paddle.speed=basePaddle.baseSpeed;
+      const speed=2.6+(state.level-1)*0.22; const dx=(Math.random()>0.5?1:-1)*(speed*(Math.random()*0.5+0.8)); const dy=-speed; balls=[{x:canvas.width/2,y:canvas.height-100,dx,dy,stuck:false,trail:[]}]; };
+
+    const initGame=(full=true)=>{ if(full){ state.score=0; state.lives=3; state.level=1; }
+      setupBricks(state.level); resetBallAndPaddle(); particles=[]; coins=[]; powerups=[]; state.running=false; state.paused=false; state.stickyActive=false; state.shieldActive=false; hideOverlay(); updateHUD(); draw(); };
+
+    /* FX & pickups */
+    const spawnParticles=(x,y,color,cnt=18)=>{ for(let i=0;i<cnt;i++){ particles.push({x,y,vx:(Math.random()-0.5)*3.6,vy:(Math.random()-1.6)*3.6,life:30+Math.random()*30,color}); } };
+    const spawnCoin=(x,y)=>{ coins.push({x,y,vy:1.8}); };
+    const spawnPower=(x,y)=>{ const t=['expand','slow','multi','shield','sticky']; powerups.push({x,y,vy:1.6,type:t[(Math.random()*t.length)|0]}); };
+
+    const applyPower=(type)=>{ if(type==='expand'){ paddle.width=Math.min(300,paddle.width+40); showOverlayTemp('Power-Up','Paddle Expanded'); sfx(420,0.08,0.04); }
+      else if(type==='slow'){ balls.forEach(b=>{ b.dx*=0.7; b.dy*=0.7; }); showOverlayTemp('Power-Up','Ball Slowed'); sfx(320,0.07,0.04); }
+      else if(type==='multi'){ const extra=[]; balls.forEach(b=>extra.push({...b,dx:b.dx*0.9},{...b,dx:-b.dx*0.9})); balls=balls.concat(extra).slice(0,6); showOverlayTemp('Power-Up','Multi-ball!'); sfx(880,0.06,0.04); }
+      else if(type==='shield'){ state.shieldActive=true; showOverlayTemp('Power-Up','Shield Active'); sfx(260,0.09,0.04); }
+      else if(type==='sticky'){ state.stickyActive=true; setTimeout(()=>state.stickyActive=false,9000); showOverlayTemp('Power-Up','Sticky Paddle (short)'); sfx(640,0.06,0.04); } };
+
+    /* Collisions */
+    const collisionDetection=()=>{
+      for(let bi=balls.length-1;bi>=0;bi--){ const bb=balls[bi];
+        for(let c=0;c<brickCfg.col;c++){ for(let r=0;r<brickCfg.row;r++){ const b=bricks[c][r]; if(!b||b.hits<=0) continue;
+          const bx=(b.x||(c*(brickCfg.w+brickCfg.pad)+brickCfg.offLeft)); const by=r*(brickCfg.h+brickCfg.pad)+brickCfg.offTop; const bw=brickCfg.w, bh=brickCfg.h; b.x=bx; b.y=by;
+          if(bb.x>bx && bb.x<bx+bw && bb.y>by && bb.y<by+bh){
+            const prevX=bb.x-bb.dx; const side=(prevX<=bx||prevX>=bx+bw);
+            if(side) bb.dx=-bb.dx; else bb.dy=-bb.dy;
+            b.hits--; spawnParticles(bb.x,bb.y,`hsl(${(r*30+c*10)%360} 85% 55%)`,14);
+            state.score+=12; if(Math.random()<0.12) spawnCoin(bx+bw/2,by+bh/2); if(Math.random()<0.08) spawnPower(bx+bw/2,by+bh/2);
+            sfx(520,0.04,0.03);
+            const remaining=bricks.flat().filter(x=>x.hits>0).length; if(remaining===0) levelClear();
+          }
+        }}}
+      const paddleTop=canvas.height-paddle.height-18;
+      for(let i=balls.length-1;i>=0;i--){ const b=balls[i];
+        if(b.y+BALL_R>paddleTop && b.y-BALL_R<paddleTop+paddle.height && b.x>paddle.x && b.x<paddle.x+paddle.width){
+          if(state.stickyActive){ b.dx=0; b.dy=0; b.stuck=true; setTimeout(()=>{ if(b.stuck){ b.stuck=false; b.dx=(Math.random()>0.5?1:-1)*2.6; b.dy=-2.6; } },2200); }
+          else { const hit=(b.x-(paddle.x+paddle.width/2))/(paddle.width/2); const ang=hit*Math.PI/3; const sp=Math.hypot(b.dx,b.dy)||3; b.dx=sp*Math.sin(ang); b.dy=-Math.abs(sp*Math.cos(ang)); if(Math.abs(b.dy)<1.2) b.dy=-1.2; }
+          spawnParticles(b.x,b.y,'#fff',8); sfx(760,0.03,0.03); b.trail=[];
+        }
+      }
+      for(let i=coins.length-1;i>=0;i--){ const c=coins[i]; c.y+=c.vy;
+        if(c.y+10>=canvas.height-paddle.height-18 && c.x>paddle.x && c.x<paddle.x+paddle.width){ store.coins++; save(); coins.splice(i,1); spawnParticles(c.x,c.y,'#ffd24d',16); sfx(820,0.05,0.03); }
+        else if(c.y>canvas.height+20) coins.splice(i,1);
+      }
+      for(let i=powerups.length-1;i>=0;i--){ const p=powerups[i]; p.y+=p.vy;
+        if(p.y+10>=canvas.height-paddle.height-18 && p.x>paddle.x && p.x<paddle.x+paddle.width){ applyPower(p.type); powerups.splice(i,1); }
+        else if(p.y>canvas.height+20) powerups.splice(i,1);
+      }
+    };
+
+    /* Level / overlay */
+    const levelClear=()=>{ state.running=false; const reward=10+Math.floor(state.level*3); store.coins+=reward; save(); showOverlayTemp('Level Cleared',`+${reward} coins — Next level`,900);
+      state.level++; setupBricks(state.level); resetBallAndPaddle(); updateHUD();
+      setTimeout(()=>{ hideOverlay(); state.running=true; requestAnimationFrame(update); },1000); sfx(980,0.14,0.05,'triangle'); };
+    const endGameAuto=()=>{ state.running=false; showOverlay('Game Over',`Score ${state.score} — Restarting…`);
+      setTimeout(()=>{ hideOverlay(); promptAndSaveScore(); setTimeout(()=>{ restartGame(); },900); },1000); };
+
+    const showOverlay=(title,text)=>{ overlayEl.innerHTML=`<div class="card"><div style="font-size:18px;font-weight:700">${title}</div><div style="margin-top:6px;color:#cfe5ff">${text}</div></div>`; overlayEl.style.pointerEvents='auto'; };
+    const hideOverlay=()=>{ overlayEl.innerHTML=''; overlayEl.style.pointerEvents='none'; };
+    const showOverlayTemp=(title,text,t=1000)=>{ showOverlay(title,text); setTimeout(hideOverlay,t); };
+
+    /* Draw / loop */
+    const rr=(ctx,x,y,w,h,r)=>{ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); };
+    const draw=()=>{
+      ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,canvas.width,canvas.height);
+      const g=ctx.createLinearGradient(0,0,0,canvas.height); g.addColorStop(0,'#031122'); g.addColorStop(1,'#031a26'); ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
+      for(let c=0;c<brickCfg.col;c++){ for(let r=0;r<brickCfg.row;r++){ const b=bricks[c][r]; if(!b||b.hits<=0) continue;
+        const baseX=c*(brickCfg.w+brickCfg.pad)+brickCfg.offLeft;
+        if(b.moving){ b.x=(b.x||baseX)+b.dir*0.6; const min=baseX-12,max=baseX+12; if(b.x<min||b.x>max) b.dir*=-1; } else b.x=baseX;
+        const bx=b.x, by=r*(brickCfg.h+brickCfg.pad)+brickCfg.offTop; const hue=(r*28+c*10+(b.hits-1)*45)%360; ctx.fillStyle=`hsl(${hue} 85% ${50 - b.hits*6}%)`;
+        rr(ctx,bx,by,brickCfg.w,brickCfg.h,6); ctx.fill();
+        if(b.hits>1){ ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(bx,by,brickCfg.w,brickCfg.h/3); ctx.fillStyle='#fff'; ctx.font='12px Inter,Arial'; ctx.fillText(b.hits,bx+brickCfg.w-16,by+16); }
+      }}
+      coins.forEach(c=>{ ctx.beginPath(); ctx.fillStyle='#ffd24d'; ctx.arc(c.x,c.y,8,0,Math.PI*2); ctx.fill(); ctx.closePath(); });
+      powerups.forEach(p=>{ ctx.beginPath(); ctx.fillStyle = p.type==='expand'?'#6ee7b7':p.type==='slow'?'#93c5fd':p.type==='multi'?'#ffd580':p.type==='shield'?'#b5f5ff':'#ffb3e6'; ctx.arc(p.x,p.y,10,0,Math.PI*2); ctx.fill(); ctx.closePath(); ctx.fillStyle='#041226'; ctx.font='10px Inter'; ctx.fillText(p.type[0].toUpperCase(),p.x-3,p.y+3); });
+      for(let i=particles.length-1;i>=0;i--){ const p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.life-=1; ctx.globalAlpha=Math.max(0,p.life/60); ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,2,2); ctx.globalAlpha=1; if(p.life<=0) particles.splice(i,1); }
+      for(let i=0;i<balls.length;i++){ const b=balls[i]; b.trail=b.trail||[]; b.trail.unshift({x:b.x,y:b.y}); if(b.trail.length>20) b.trail.pop();
+        for(let t=0;t<b.trail.length;t++){ const tt=b.trail[t]; ctx.globalAlpha=(1-t/b.trail.length)*0.6; const size=BALL_R*(1 - t/b.trail.length*0.6); ctx.beginPath(); ctx.fillStyle='#7be0ff'; ctx.arc(tt.x,tt.y,size,0,Math.PI*2); ctx.fill(); ctx.closePath(); }
+        ctx.globalAlpha=1; const grd=ctx.createRadialGradient(b.x-3,b.y-3,2,b.x,b.y,BALL_R+6); grd.addColorStop(0,'#fff'); grd.addColorStop(0.2,'#bff'); grd.addColorStop(1,'#06b6d4'); ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(b.x,b.y,BALL_R,0,Math.PI*2); ctx.fill(); ctx.closePath(); }
+      const px=paddle.x, py=canvas.height-paddle.height-18; ctx.save(); ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=12; ctx.fillStyle='#ff7b7b'; rr(ctx,px,py,paddle.width,paddle.height,12); ctx.fill(); ctx.restore();
+      if(state.shieldActive){ ctx.beginPath(); ctx.strokeStyle='rgba(96,165,250,0.7)'; ctx.lineWidth=4; ctx.arc(px+paddle.width/2,py+paddle.height/2,paddle.width/1.9,0,Math.PI*2); ctx.stroke(); ctx.closePath(); }
+      ctx.fillStyle='#dff1ff'; ctx.font='16px Inter,Arial'; ctx.fillText('Score: '+state.score,12,22); ctx.fillText('Level: '+state.level,12,42);
+    };
+    const update=(now=0)=>{
+      if(!state.running||state.paused) return;
+      for(let i=balls.length-1;i>=0;i--){ const b=balls[i];
+        if(b.stuck){ b.x=paddle.x+paddle.width/2; b.y=canvas.height-paddle.height-18-BALL_R-2; }
+        else { b.x+=b.dx; b.y+=b.dy; }
+        if(b.x+b.dx>canvas.width-BALL_R||b.x+b.dx<BALL_R){ b.dx=-b.dx; sfx(420,0.02,0.02); }
+        if(b.y+b.dy<BALL_R){ b.dy=-b.dy; sfx(460,0.02,0.02); }
+        else if(b.y-BALL_R>canvas.height){ balls.splice(i,1); }
+      }
+      if(balls.length===0){
+        if(state.shieldActive){ state.shieldActive=false; resetBallAndPaddle(); showOverlayTemp('Shield used','You were saved'); }
+        else { state.lives--; sfx(160,0.12,0.04);
+          if(state.lives<=0){ endGameAuto(); save(); return; }
+          resetBallAndPaddle(); state.paused=true; setTimeout(()=>state.paused=false,800);
+        }
+      }
+      if(controls.right){ paddle.speed=Math.min(basePaddle.maxSpeed,paddle.speed+basePaddle.accel); paddle.x+=paddle.speed; }
+      else if(controls.left){ paddle.speed=Math.min(basePaddle.maxSpeed,paddle.speed+basePaddle.accel); paddle.x-=paddle.speed; }
+      else { paddle.speed=basePaddle.baseSpeed; }
+      paddle.x=Math.max(0,Math.min(canvas.width-paddle.width,paddle.x));
+      balls.forEach(b=>{ b.dx*=1+0.00012*state.level; b.dy*=1+0.00012*state.level; });
+      collisionDetection(); coins.forEach(c=>c.y+=1.6); powerups.forEach(p=>p.y+=p.vy);
+      draw(); updateHUD(); if(state.score>store.high){ store.high=state.score; save(); }
+      requestAnimationFrame(update);
+    };
+
+    /* Input */
+    window.addEventListener('keydown', e=>{ const k=e.key;
+      if(k==='ArrowRight'||k==='Right'||k==='d'||k==='D') controls.right=true;
+      else if(k==='ArrowLeft'||k==='Left'||k==='a'||k==='A') controls.left=true;
+      else if(k===' '){ if(state.running){ state.paused=!state.paused; state.paused?showOverlay('Paused','Press Start to resume'):hideOverlay(); } }
+      else if(k.toLowerCase()==='r'){ restartGame(); }
+      else if(k==='1'){ if((store.powers.multi||0)>0){ store.powers.multi--; save(); applyPower('multi'); maybeRefreshInventory(); } }
+      else if(k==='2'){ if((store.powers.shield||0)>0){ store.powers.shield--; save(); applyPower('shield'); maybeRefreshInventory(); } }
+      else if(k==='3'){ if((store.powers.slow||0)>0){ store.powers.slow--; save(); applyPower('slow'); maybeRefreshInventory(); } }
+      else if(k==='4'){ if((store.powers.expand||0)>0){ store.powers.expand--; save(); applyPower('expand'); maybeRefreshInventory(); } }
+      else if(k==='5'){ if((store.powers.sticky||0)>0){ store.powers.sticky--; save(); applyPower('sticky'); maybeRefreshInventory(); } }
+    });
+    window.addEventListener('keyup', e=>{ const k=e.key; if(k==='ArrowRight'||k==='Right'||k==='d'||k==='D') controls.right=false; else if(k==='ArrowLeft'||k==='Left'||k==='a'||k==='A') controls.left=false; });
+    window.addEventListener('blur', ()=>{ controls.left=false; controls.right=false; });
+
+    let dragging=false, dragOffset=0;
+    canvas.addEventListener('pointerdown', e=>{ const r=canvas.getBoundingClientRect(); const x=e.clientX-r.left;
+      if(x>=paddle.x && x<=paddle.x+paddle.width){ dragging=true; dragOffset=x-paddle.x; canvas.setPointerCapture(e.pointerId); }
+      else { if(!state.running) startGame(); balls.forEach(b=>{ if(b.stuck){ b.stuck=false; b.dx=(Math.random()>0.5?1:-1)*2.6; b.dy=-2.6; } }); } });
+    canvas.addEventListener('pointermove', e=>{ if(!dragging) return; const r=canvas.getBoundingClientRect(); const x=e.clientX-r.left; paddle.x=Math.max(0,Math.min(canvas.width-paddle.width,x-dragOffset)); });
+    canvas.addEventListener('pointerup', ()=>dragging=false); canvas.addEventListener('pointercancel', ()=>dragging=false);
+
+    /* Shop / Tabs */
+    const skins=[{id:'default',name:'Default Paddle',cost:0},{id:'neon',name:'Neon Blue Paddle',cost:80},{id:'gold',name:'Gold Paddle',cost:160}];
+    const ballSkins=[{id:'white',name:'Classic Ball',cost:0},{id:'fire',name:'Fire Ball',cost:100},{id:'electric',name:'Electric Ball',cost:160}];
+    const packs=[{id:'multi',name:'Multi-ball +1',cost:50},{id:'shield',name:'Shield +1',cost:50},{id:'slow',name:'Slow +1',cost:40},{id:'expand',name:'Expand +1',cost:40},{id:'sticky',name:'Sticky +1',cost:35}];
+
+    const renderSkins=()=>{ tabContent.innerHTML=''; const grid=document.createElement('div'); grid.className='shop-grid';
+      skins.forEach(s=>{ const div=document.createElement('div'); div.className='shop-item'; const owned=store.unlocked.includes(s.id);
+        div.innerHTML=`<strong>${s.name}</strong><div style="color:#9fb1c9;font-size:12px">${s.cost? s.cost+' coins':'free'}</div>`;
+        const btn=document.createElement('button'); btn.textContent=owned?'Equip':'Buy';
+        btn.onclick=()=>{ if(owned){ store.trail=s.id; localStorage.setItem(LS.TRAIL,s.id); showOverlayTemp('Equipped',s.name,900); } else if(store.coins>=s.cost){ store.coins-=s.cost; store.unlocked.push(s.id); save(); renderSkins(); updateHUD(); showOverlayTemp('Purchased',s.name,900); } else showOverlayTemp('Not enough coins','Play more to earn',900); };
+        div.appendChild(btn); grid.appendChild(div); });
+      ballSkins.forEach(s=>{ const key='ball_'+s.id; const owned=store.unlocked.includes(key);
+        const div=document.createElement('div'); div.className='shop-item'; div.innerHTML=`<strong>${s.name}</strong><div style="color:#9fb1c9;font-size:12px">${s.cost? s.cost+' coins':'free'}</div>`;
+        const btn=document.createElement('button'); btn.textContent=owned?'Equip':'Buy';
+        btn.onclick=()=>{ if(owned){ store.trail=s.id; localStorage.setItem(LS.TRAIL,s.id); showOverlayTemp('Equipped',s.name,900); } else if(store.coins>=s.cost){ store.coins-=s.cost; store.unlocked.push(key); save(); renderSkins(); updateHUD(); showOverlayTemp('Purchased',s.name,900); } else showOverlayTemp('Not enough coins','Play more to earn',900); };
+        div.appendChild(btn); grid.appendChild(div); });
+      tabContent.appendChild(grid); };
+    const renderPacks=()=>{ tabContent.innerHTML=''; const grid=document.createElement('div'); grid.className='shop-grid';
+      packs.forEach(p=>{ const div=document.createElement('div'); div.className='shop-item'; div.innerHTML=`<strong>${p.name}</strong><div style="color:#9fb1c9;font-size:12px">Add to inventory</div><div style="margin-top:6px">${p.cost} coins</div>`;
+        const btn=document.createElement('button'); btn.textContent='Buy'; btn.onclick=()=>{ if(store.coins>=p.cost){ store.coins-=p.cost; store.powers[p.id]=(store.powers[p.id]||0)+1; save(); renderInventory(); updateHUD(); showOverlayTemp('Purchased',p.name,900); } else showOverlayTemp('Not enough coins','Play more to earn',900); };
+        div.appendChild(btn); grid.appendChild(div); });
+      tabContent.appendChild(grid); };
+    const renderInventory=()=>{ tabContent.innerHTML=''; const grid=document.createElement('div'); grid.className='shop-grid';
+      Object.keys(store.powers).forEach(k=>{ const div=document.createElement('div'); div.className='shop-item';
+        div.innerHTML=`<strong>${k}</strong><div style="color:#9fb1c9;font-size:12px">Stored: ${store.powers[k]||0}</div><div style="margin-top:6px">Use: ${({'multi':'1','shield':'2','slow':'3','expand':'4','sticky':'5'})[k]}</div>`;
+        const btn=document.createElement('button'); btn.textContent='Use Now'; btn.onclick=()=>{ if((store.powers[k]||0)>0){ store.powers[k]--; save(); applyPower(k); renderInventory(); } else showOverlayTemp('No item','Not in inventory',900); };
+        div.appendChild(btn); grid.appendChild(div); });
+      tabContent.appendChild(grid); };
+    const renderLeader=()=>{ tabContent.innerHTML=''; const container=document.createElement('div'); const list=(store.leaderboard||[]).slice(0,30);
+      container.innerHTML=`<div style="margin-bottom:8px"><strong>Top scores (local)</strong></div>
+        <div style="max-height:220px;overflow:auto">${list.map((e,i)=>`<div style="display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.06)">${i+1}. ${e.name} <span>${e.score}</span></div>`).join('')}</div>
+        <div style="display:flex;gap:8px;margin-top:8px"><button id="clearLead">Clear</button><button id="importBtn">Import JSON</button></div>`;
+      tabContent.appendChild(container);
+      const clearLead=document.getElementById('clearLead'); const importBtn=document.getElementById('importBtn');
+      clearLead.onclick=()=>{ store.leaderboard=[]; save(); renderLeader(); };
+      importBtn.onclick=()=> importFile.click(); };
+    const renderSettings=()=>{ tabContent.innerHTML=`<div class="shop-item"><strong>Audio</strong><div style="margin-top:6px"><button id="musicToggle">${musicOn?'Stop Music':'Play Music'}</button></div></div>
+      <div class="shop-item"><strong>Ads</strong><div style="margin-top:6px"><button id="toggleAds">${store.noAds?'Enable Banner':'Disable Banner'}</button></div><div style="color:#9fb1c9;font-size:12px;margin-top:6px">“Remove Ads” in top bar hides ads on this device.</div></div>`;
+      document.getElementById('musicToggle').onclick=()=>{ musicOn?stopMusic():startMusic(); document.getElementById('musicToggle').textContent=musicOn?'Stop Music':'Play Music'; };
+      document.getElementById('toggleAds').onclick=()=>{ store.noAds=!store.noAds; save(); bannerBox.style.display=store.noAds?'none':'block'; updateHUD(); }; };
+    const maybeRefreshInventory=()=>{ if(tabContent.textContent && tabContent.textContent.includes('Stored:')) renderInventory(); };
+
+    shopBtn.onclick=()=>{ shopModal.style.display='flex'; renderSkins(); };
+    closeShopBtn.onclick=()=>{ shopModal.style.display='none'; tabContent.innerHTML=''; };
+    document.querySelectorAll('.tabBtn').forEach(b=>b.addEventListener('click',()=>{ const t=b.dataset.tab; if(t==='skins') renderSkins(); else if(t==='packs') renderPacks(); else if(t==='inventory') renderInventory(); else if(t==='leader') renderLeader(); else if(t==='settings') renderSettings(); }));
+
+    /* Export / import */
+    exportBtn.onclick=()=>{ const data=JSON.stringify(store.leaderboard||[],null,2); const blob=new Blob([data],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='brick-leaderboard.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); };
+    importFile.onchange=ev=>{ const f=ev.target.files[0]; if(!f) return; const reader=new FileReader(); reader.onload=e=>{ try{ const arr=JSON.parse(e.target.result); if(Array.isArray(arr)){ store.leaderboard=(store.leaderboard||[]).concat(arr).sort((a,b)=>b.score-a.score).slice(0,100); save(); showOverlayTemp('Imported','Leaderboard merged',900);} else showOverlayTemp('Invalid file','JSON array expected',1200);}catch(_){ showOverlayTemp('Import failed','Invalid JSON',1200);} }; reader.readAsText(f); };
+
+    /* Start / pause / restart */
+    const startGame=()=>{ if(!state.running){ state.running=true; state.paused=false; hideOverlay(); resetBallAndPaddle(); if(audio && audio.state==='suspended') audio.resume().catch(()=>{}); if(!musicOn) startMusic(); requestAnimationFrame(update); } };
+    const restartGame=()=>{ state.running=false; state.paused=false; state.score=0; state.lives=3; state.level=1; setupBricks(state.level); resetBallAndPaddle(); updateHUD(); showOverlayTemp('Restarted','Press Start to play',800); };
+    startBtn.onclick=startGame; pauseBtn.onclick=()=>{ if(!state.running) return; state.paused=!state.paused; state.paused?showOverlay('Paused','Press Start to resume'):hideOverlay(); }; restartBtn.onclick=restartGame;
+
+    /* Monetization */
+    const REWARD_COINS=30, AD_SECONDS=15, AD_COOLDOWN_MS=60_000; let adTimer=null, adRemain=AD_SECONDS, adPaused=false;
+    const canWatchAd=()=> Date.now()-store.lastAd>=AD_COOLDOWN_MS;
+    const openAd=()=>{ if(store.noAds){ showOverlayTemp('Ads removed','Thanks!',900); return; } if(!canWatchAd()){ const w=Math.ceil((AD_COOLDOWN_MS-(Date.now()-store.lastAd))/1000); showOverlayTemp('Please wait',`Next ad in ${w}s`,1200); return; }
+      state.paused=true; adRemain=AD_SECONDS; adPaused=false; adTimeEl.textContent=String(adRemain); adCloseBtn.disabled=true; adModal.style.display='flex';
+      const tick=()=>{ if(adPaused) return; adRemain--; adTimeEl.textContent=String(adRemain);
+        if(adRemain<=0){ clearInterval(adTimer); adTimer=null; adCloseBtn.disabled=false; store.coins+=REWARD_COINS; store.lastAd=Date.now(); save(); updateHUD(); showOverlayTemp('Reward Granted',`+${REWARD_COINS} coins`,1200); } };
+      adTimer=setInterval(tick,1000);
+    };
+    const closeAd=()=>{ adModal.style.display='none'; if(adTimer){ clearInterval(adTimer); adTimer=null; } adPaused=false; state.paused=false; if(state.running) requestAnimationFrame(update); };
+    rewardBtn.onclick=openAd; adCloseBtn.onclick=closeAd;
+    document.addEventListener('visibilitychange',()=>{ if(adModal.style.display==='flex'){ adPaused=document.hidden; } });
+
+    const ONE_DAY=24*60*60*1000; const dailyOk=()=> Date.now()-store.lastDaily>=ONE_DAY;
+    dailyBtn.onclick=()=>{ if(!dailyOk()){ const h=Math.ceil((ONE_DAY-(Date.now()-store.lastDaily))/3600000); showOverlayTemp('Come back later',`Daily reward in ~${h}h`,1200); return; }
+      const gain=40; store.coins+=gain; store.lastDaily=Date.now(); save(); updateHUD(); showOverlayTemp('Daily Reward',`+${gain} coins`,1200); };
+
+    removeAdsBtn.onclick=()=>{ if(store.noAds){ showOverlayTemp('Already removed','Enjoy!',900); return; } const cost=300;
+      if(store.coins<cost){ showOverlayTemp('Not enough coins',`Need ${cost} coins`,1200); return; }
+      store.coins-=cost; store.noAds=true; save(); bannerBox.style.display='none'; showOverlayTemp('Ads removed','Thanks for supporting!',1200); updateHUD(); };
+
+    shareBtn.onclick=async()=>{ const url=location.href, title='Arcade Brick Breaker', text='Try this free Brick Breaker!';
+      if(navigator.share){ try{ await navigator.share({title,text,url}); showOverlayTemp('Shared','Thanks!',900);}catch(_){ } }
+      else { try{ await navigator.clipboard.writeText(url); showOverlayTemp('Copied','Link copied!',900);}catch(_){ showOverlayTemp('Link','URL: '+url,1500);} } };
+
+    window.promptAndSaveScore=()=>{ const card=document.createElement('div'); card.className='card';
+      card.innerHTML=`<div style="font-size:18px;font-weight:600;margin-bottom:8px">Submit score</div>
+        <div style="margin-bottom:8px">Score: <strong>${state.score}</strong></div>
+        <div style="display:flex;gap:8px;justify-content:center"><input id="playerName" placeholder="Your name" style="padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:#e8f6ff"><button id="saveScoreBtn">Save</button></div>
+        <div style="font-size:12px;margin-top:8px;color:#9fb1c9">Leaderboard saves locally. Add Firebase config to make it global.</div>`;
+      overlayEl.innerHTML=''; overlayEl.appendChild(card); overlayEl.style.pointerEvents='auto';
+      const input=$('playerName'); const btn=$('saveScoreBtn'); input.focus();
+      btn.onclick=async()=>{ const name=(input.value||'Player').substring(0,24);
+        const entry={ name, score:state.score, date:new Date().toISOString() };
+        store.leaderboard.push(entry);
+        store.leaderboard.sort((a,b)=>b.score-a.score); store.leaderboard=store.leaderboard.slice(0,50); save(); showOverlayTemp('Saved','Score saved',900); overlayEl.innerHTML=''; updateHUD();
+      };
+    };
+
+    /* Boot */
+    const start=()=>{ setupBricks(state.level); resetBallAndPaddle(); updateHUD(); showOverlay('Arcade Brick Breaker','Press Start. Earn coins by playing, daily reward, or watching a rewarded ad.'); draw(); };
+    const draw=()=>{}; // placeholder to satisfy hoisting (already defined above)
+    start();
+  });
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(()=>{});
+      });
+    }
+  </script>
+</body>
+</html>
