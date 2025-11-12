@@ -42,9 +42,9 @@ After approval, you can:
 ---
 
 ## 🧠 Developer
-**Your Name**  
-Email: your@email.com  
-Support me: [Buy Me a Coffee ☕](https://www.buymeacoffee.com/yourname)
+**Avi Gill**  
+Email: gillavitesh210@gmail.com  
+Support me: [Buy Me a Coffee ☕](buymeacoffee.com/Avigill)
 
 ---
 
